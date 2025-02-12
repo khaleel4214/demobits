@@ -1,0 +1,104 @@
+{
+	"name": "dataflow1",
+	"properties": {
+		"type": "MappingDataFlow",
+		"typeProperties": {
+			"sources": [
+				{
+					"dataset": {
+						"referenceName": "DS_Storage_PurchaseOrder",
+						"type": "DatasetReference"
+					},
+					"name": "PurchaseOrder"
+				},
+				{
+					"dataset": {
+						"referenceName": "DS_Storage_Customer",
+						"type": "DatasetReference"
+					},
+					"name": "Customer"
+				}
+			],
+			"sinks": [
+				{
+					"dataset": {
+						"referenceName": "AzureSqlTable1",
+						"type": "DatasetReference"
+					},
+					"name": "Output"
+				}
+			],
+			"transformations": [
+				{
+					"name": "PurchaseOrderProjection"
+				},
+				{
+					"name": "CustomerProjection"
+				},
+				{
+					"name": "DataQualotyChecks"
+				},
+				{
+					"name": "Joinstream"
+				},
+				{
+					"name": "MetricCalculation"
+				}
+			],
+			"scriptLines": [
+				"source(output(",
+				"          POID as string,",
+				"          CustomerID as string,",
+				"          OrderDate as string,",
+				"          Total as long",
+				"     ),",
+				"     allowSchemaDrift: true,",
+				"     validateSchema: false,",
+				"     ignoreNoFilesFound: false) ~> PurchaseOrder",
+				"source(output(",
+				"          CustomerID as string,",
+				"          Name as string,",
+				"          Email as string,",
+				"          Phone as string,",
+				"          Address as string",
+				"     ),",
+				"     allowSchemaDrift: true,",
+				"     validateSchema: false,",
+				"     ignoreNoFilesFound: false) ~> Customer",
+				"PurchaseOrder select(mapColumn(",
+				"          POID,",
+				"          CustomerID,",
+				"          Total",
+				"     ),",
+				"     skipDuplicateMapInputs: true,",
+				"     skipDuplicateMapOutputs: true) ~> PurchaseOrderProjection",
+				"Customer select(mapColumn(",
+				"          CustomerID,",
+				"          Name,",
+				"          Email",
+				"     ),",
+				"     skipDuplicateMapInputs: true,",
+				"     skipDuplicateMapOutputs: true) ~> CustomerProjection",
+				"PurchaseOrderProjection filter(greater(Total, 0)) ~> DataQualotyChecks",
+				"DataQualotyChecks, CustomerProjection join(PurchaseOrderProjection@CustomerID == CustomerProjection@CustomerID,",
+				"     joinType:'inner',",
+				"     matchType:'exact',",
+				"     ignoreSpaces: false,",
+				"     broadcast: 'auto')~> Joinstream",
+				"Joinstream aggregate(groupBy(CustomerProjection@CustomerID,",
+				"          Name),",
+				"     PurchaseOrder = sum(Total)) ~> MetricCalculation",
+				"MetricCalculation sink(allowSchemaDrift: true,",
+				"     validateSchema: false,",
+				"     deletable:false,",
+				"     insertable:true,",
+				"     updateable:false,",
+				"     upsertable:false,",
+				"     format: 'table',",
+				"     skipDuplicateMapInputs: true,",
+				"     skipDuplicateMapOutputs: true,",
+				"     errorHandlingOption: 'stopOnFirstError') ~> Output"
+			]
+		}
+	}
+}
