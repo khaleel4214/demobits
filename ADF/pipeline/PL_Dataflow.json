@@ -1,6 +1,7 @@
 {
 	"name": "PL_Dataflow",
 	"properties": {
+		"description": "branch testing",
 		"activities": [
 			{
 				"name": "Data flow activity",
